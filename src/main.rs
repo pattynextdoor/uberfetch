@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use clap::{Parser, ValueEnum};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::DefaultTerminal;
+use tachyonfx::{fx, Shader};
 
 use animation::diamond::Diamond;
 use animation::Animation;
@@ -72,9 +73,26 @@ fn run(
     let tick_rate = Duration::from_secs_f64(1.0 / f64::from(fps));
     let mut last_tick = Instant::now();
 
+    // A subtle, never-ending HSL color shift applied as a post-processing
+    // effect over the animation panel.  `ping_pong` plays the shift forward
+    // then backward so the hue oscillates smoothly, and `never_complete`
+    // keeps it looping forever.
+    let mut glow = fx::never_complete(fx::ping_pong(fx::hsl_shift_fg(
+        [30.0, 0.0, 0.05],
+        3000u32, // 3 s per half-cycle, linear interpolation
+    )));
+
     loop {
+        // Capture elapsed time *before* drawing so the effect can advance by
+        // the real wall-clock delta since the last frame.
+        let elapsed = last_tick.elapsed();
+
         terminal.draw(|frame| {
             renderer::layout::draw(frame, animation, info);
+
+            // Apply the glow effect to just the animation panel region.
+            let anim_area = renderer::layout::animation_rect(frame.area());
+            glow.process(elapsed.into(), frame.buffer_mut(), anim_area);
         })?;
 
         let timeout = tick_rate.saturating_sub(last_tick.elapsed());

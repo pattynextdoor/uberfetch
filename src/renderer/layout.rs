@@ -14,34 +14,29 @@ const MIN_WIDTH: u16 = 80;
 const MIN_HEIGHT: u16 = 24;
 
 /// Draw the full uberfetch display: animation (left) + system info (right).
-pub fn draw(frame: &mut Frame, animation: &dyn Animation, info: &SystemInfo) {
+/// Returns the animation panel `Rect` so callers can apply post-processing effects.
+pub fn draw(frame: &mut Frame, animation: &dyn Animation, info: &SystemInfo) -> Option<Rect> {
     let area = frame.area();
 
     if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
         let msg = Paragraph::new("Terminal too small (need 80x24)")
             .style(Style::default().fg(ratatui::style::Color::Red));
         frame.render_widget(msg, area);
-        return;
+        return None;
     }
 
-    let chunks = Layout::horizontal([
-        Constraint::Percentage(60),
-        Constraint::Percentage(40),
-    ])
-    .split(area);
-
+    let chunks = split_layout(area);
     draw_animation(frame, animation, chunks[0]);
     draw_info(frame, info, chunks[1]);
+    Some(chunks[0])
 }
 
-/// Returns the Rect used by the animation panel (for applying effects).
-pub fn animation_rect(area: Rect) -> Rect {
-    let chunks = Layout::horizontal([
+fn split_layout(area: Rect) -> std::rc::Rc<[Rect]> {
+    Layout::horizontal([
         Constraint::Percentage(60),
         Constraint::Percentage(40),
     ])
-    .split(area);
-    chunks[0]
+    .split(area)
 }
 
 fn draw_animation(frame: &mut Frame, animation: &dyn Animation, area: Rect) {

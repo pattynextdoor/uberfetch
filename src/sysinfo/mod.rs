@@ -22,6 +22,8 @@ impl SystemInfo {
         return macos::collect();
         #[cfg(target_os = "linux")]
         return linux::collect();
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        compile_error!("uberfetch only supports macOS and Linux");
     }
 }
 
@@ -30,10 +32,17 @@ pub fn format_uptime(total_secs: u64) -> String {
     let days = total_secs / 86400;
     let hours = (total_secs % 86400) / 3600;
     let mins = (total_secs % 3600) / 60;
+    let plural = |n, word: &str| {
+        if n == 1 {
+            format!("{n} {word}")
+        } else {
+            format!("{n} {word}s")
+        }
+    };
     match (days, hours, mins) {
-        (0, 0, m) => format!("{m} mins"),
-        (0, h, m) => format!("{h} hours, {m} mins"),
-        (d, h, _) => format!("{d} days, {h} hours"),
+        (0, 0, m) => plural(m, "min"),
+        (0, h, m) => format!("{}, {}", plural(h, "hour"), plural(m, "min")),
+        (d, h, _) => format!("{}, {}", plural(d, "day"), plural(h, "hour")),
     }
 }
 
@@ -58,13 +67,23 @@ mod tests {
         }
 
         #[test]
+        fn returns_singular_minute_for_one_minute() {
+            assert_eq!(format_uptime(60), "1 min");
+        }
+
+        #[test]
         fn returns_hours_and_minutes_when_under_one_day() {
             assert_eq!(format_uptime(7500), "2 hours, 5 mins");
         }
 
         #[test]
+        fn returns_singular_forms_for_one_hour_one_min() {
+            assert_eq!(format_uptime(3660), "1 hour, 1 min");
+        }
+
+        #[test]
         fn returns_days_and_hours_for_long_uptimes() {
-            assert_eq!(format_uptime(100_000), "1 days, 3 hours");
+            assert_eq!(format_uptime(100_000), "1 day, 3 hours");
         }
 
         #[test]

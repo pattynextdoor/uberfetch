@@ -88,11 +88,12 @@ fn run(
         let elapsed = last_tick.elapsed();
 
         terminal.draw(|frame| {
-            renderer::layout::draw(frame, animation, info);
-
-            // Apply the glow effect to just the animation panel region.
-            let anim_area = renderer::layout::animation_rect(frame.area());
-            glow.process(elapsed.into(), frame.buffer_mut(), anim_area);
+            // draw() returns the animation panel Rect so we can apply
+            // post-processing to exactly that region (None when terminal
+            // is too small).
+            if let Some(anim_area) = renderer::layout::draw(frame, animation, info) {
+                glow.process(elapsed.into(), frame.buffer_mut(), anim_area);
+            }
         })?;
 
         let timeout = tick_rate.saturating_sub(last_tick.elapsed());

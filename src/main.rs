@@ -51,6 +51,7 @@ fn main() -> io::Result<()> {
 
     let mut anim: Box<dyn Animation> = match cli.animation {
         AnimationChoice::Diamond => Box::new(Diamond::new()),
+        AnimationChoice::Hypercube => Box::new(animation::hypercube::Hypercube::new()),
         _ => {
             eprintln!("Animation not yet implemented, using diamond");
             Box::new(Diamond::new())

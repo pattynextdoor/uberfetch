@@ -1,5 +1,6 @@
 pub mod math;
 pub mod diamond;
+pub mod hypercube;
 
 use ratatui::widgets::canvas::Context;
 

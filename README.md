@@ -1,6 +1,6 @@
 <p align="center">
 
-<img src="https://media1.tenor.com/m/0Fp0aFT9LHIAAAAC/wireframe-neon.gif" width="400" alt="uberfetch" />
+<img src="uberfetchdemo.gif" width="600" alt="uberfetch demo" />
 
 <br/>
 

@@ -24,3 +24,62 @@ impl SystemInfo {
         return linux::collect();
     }
 }
+
+/// Format seconds into a human-readable uptime string.
+pub fn format_uptime(total_secs: u64) -> String {
+    let days = total_secs / 86400;
+    let hours = (total_secs % 86400) / 3600;
+    let mins = (total_secs % 3600) / 60;
+    match (days, hours, mins) {
+        (0, 0, m) => format!("{m} mins"),
+        (0, h, m) => format!("{h} hours, {m} mins"),
+        (d, h, _) => format!("{d} days, {h} hours"),
+    }
+}
+
+/// Format memory usage as "X.X GiB / Y.Y GiB".
+pub fn format_memory(used_bytes: u64, total_bytes: u64) -> String {
+    let used_gib = used_bytes as f64 / 1_073_741_824.0;
+    let total_gib = total_bytes as f64 / 1_073_741_824.0;
+    format!("{used_gib:.1} GiB / {total_gib:.1} GiB")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod format_uptime {
+        use super::*;
+
+        #[test]
+        fn returns_minutes_when_under_one_hour() {
+            assert_eq!(format_uptime(300), "5 mins");
+        }
+
+        #[test]
+        fn returns_hours_and_minutes_when_under_one_day() {
+            assert_eq!(format_uptime(7500), "2 hours, 5 mins");
+        }
+
+        #[test]
+        fn returns_days_and_hours_for_long_uptimes() {
+            assert_eq!(format_uptime(100_000), "1 days, 3 hours");
+        }
+
+        #[test]
+        fn returns_zero_mins_for_zero_seconds() {
+            assert_eq!(format_uptime(0), "0 mins");
+        }
+    }
+
+    mod format_memory {
+        use super::*;
+
+        #[test]
+        fn formats_gib_with_one_decimal() {
+            let used = 8_589_934_592; // 8 GiB
+            let total = 17_179_869_184; // 16 GiB
+            assert_eq!(format_memory(used, total), "8.0 GiB / 16.0 GiB");
+        }
+    }
+}

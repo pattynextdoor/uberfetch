@@ -38,6 +38,7 @@ pub fn format_uptime(total_secs: u64) -> String {
 }
 
 /// Format memory usage as "X.X GiB / Y.Y GiB".
+#[expect(clippy::cast_precision_loss, reason = "byte counts fit comfortably in f64 for display")]
 pub fn format_memory(used_bytes: u64, total_bytes: u64) -> String {
     let used_gib = used_bytes as f64 / 1_073_741_824.0;
     let total_gib = total_bytes as f64 / 1_073_741_824.0;

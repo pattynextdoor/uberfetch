@@ -7,7 +7,7 @@ use super::math::{self, Vec3};
 use super::Animation;
 
 fn icosahedron_vertices() -> Vec<Vec3> {
-    let phi = (1.0 + 5.0_f64.sqrt()) / 2.0;
+    let phi = f64::midpoint(1.0, 5.0_f64.sqrt());
     let raw = vec![
         [-1.0, phi, 0.0],
         [1.0, phi, 0.0],
@@ -102,9 +102,9 @@ fn get_midpoint(
         return idx;
     }
     let mid = [
-        (verts[a][0] + verts[b][0]) / 2.0,
-        (verts[a][1] + verts[b][1]) / 2.0,
-        (verts[a][2] + verts[b][2]) / 2.0,
+        f64::midpoint(verts[a][0], verts[b][0]),
+        f64::midpoint(verts[a][1], verts[b][1]),
+        f64::midpoint(verts[a][2], verts[b][2]),
     ];
     let len = (mid[0] * mid[0] + mid[1] * mid[1] + mid[2] * mid[2]).sqrt();
     let normalized = [mid[0] / len, mid[1] / len, mid[2] / len];
@@ -144,6 +144,12 @@ impl Animation for Geodesic {
         self.angle_y += 0.5 * dt;
     }
 
+    #[expect(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "animation indices are small; color values are clamped to 0-255"
+    )]
     fn draw(&self, ctx: &mut Context) {
         let base_scale = 25.0;
         let distance = 4.0 * base_scale;

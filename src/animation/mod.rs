@@ -13,8 +13,10 @@ pub trait Animation {
     /// Render the current frame into a ratatui Canvas context.
     fn draw(&self, ctx: &mut Context);
     /// Human-readable name for CLI selection.
+    #[allow(dead_code)]
     fn name(&self) -> &'static str;
     /// Short description of the animation.
+    #[allow(dead_code)]
     fn description(&self) -> &'static str;
 }
 

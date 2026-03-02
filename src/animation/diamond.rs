@@ -47,6 +47,12 @@ impl Animation for Diamond {
         self.angle_z += 0.3 * dt;
     }
 
+    #[expect(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "animation indices are small; color values are clamped to 0-255"
+    )]
     fn draw(&self, ctx: &mut Context) {
         let pulse = 1.0 + 0.2 * (self.time * 2.5).sin();
         let base_scale = 30.0 * pulse;

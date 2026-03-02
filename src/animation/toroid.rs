@@ -27,6 +27,7 @@ pub struct Toroid {
 }
 
 impl Toroid {
+    #[expect(clippy::cast_precision_loss, reason = "animation indices are small")]
     pub fn new() -> Self {
         let particles = (0..NUM_PARTICLES)
             .map(|i| {

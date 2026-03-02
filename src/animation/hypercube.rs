@@ -30,7 +30,7 @@ fn tesseract_edges() -> Vec<(usize, usize)> {
     let mut edges = Vec::new();
     for i in 0u32..16 {
         for j in (i + 1)..16 {
-            if (i ^ j).count_ones() == 1 {
+            if (i ^ j).is_power_of_two() {
                 edges.push((i as usize, j as usize));
             }
         }

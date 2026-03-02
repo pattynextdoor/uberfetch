@@ -107,6 +107,7 @@ fn draw_info(frame: &mut Frame, info: &SystemInfo, area: Rect) {
     lines.push(Line::from(palette_bottom));
 
     // Vertically center
+    #[expect(clippy::cast_possible_truncation, reason = "info lines always fit in u16")]
     let content_height = lines.len() as u16;
     let top_padding = area.height.saturating_sub(content_height) / 2;
     let mut centered_lines: Vec<Line> = vec![Line::from(""); top_padding as usize];

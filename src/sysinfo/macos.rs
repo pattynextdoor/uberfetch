@@ -1,6 +1,4 @@
-use std::process::Command;
-
-use super::SystemInfo;
+use super::{cmd_output, SystemInfo};
 
 pub fn collect() -> SystemInfo {
     SystemInfo {
@@ -13,15 +11,6 @@ pub fn collect() -> SystemInfo {
         shell: get_shell(),
         terminal: get_terminal(),
     }
-}
-
-fn cmd_output(program: &str, args: &[&str]) -> Option<String> {
-    Command::new(program)
-        .args(args)
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_string())
 }
 
 fn sysctl(key: &str) -> Option<String> {

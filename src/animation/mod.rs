@@ -14,19 +14,20 @@ pub trait Animation {
     /// `viewport` is `(half_width, half_height)` — the canvas coordinate bounds.
     fn draw(&self, ctx: &mut Context, viewport: (f64, f64));
     /// Human-readable name for CLI selection.
-    #[allow(dead_code)]
     fn name(&self) -> &'static str;
     /// Short description of the animation.
-    #[allow(dead_code)]
     fn description(&self) -> &'static str;
 }
 
 /// Returns a list of all available animation names and descriptions.
+///
+/// Built from actual trait implementations so names/descriptions stay in sync.
 pub fn list_animations() -> Vec<(&'static str, &'static str)> {
-    vec![
-        ("diamond", "Rotating pulsating octahedron"),
-        ("hypercube", "4D tesseract rotation"),
-        ("toroid", "Toroidal particle flow"),
-        ("geodesic", "Breathing geodesic sphere"),
-    ]
+    let all: Vec<Box<dyn Animation>> = vec![
+        Box::new(diamond::Diamond::new()),
+        Box::new(hypercube::Hypercube::new()),
+        Box::new(toroid::Toroid::new()),
+        Box::new(geodesic::Geodesic::new()),
+    ];
+    all.iter().map(|a| (a.name(), a.description())).collect()
 }

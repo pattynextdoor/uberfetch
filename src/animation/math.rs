@@ -217,4 +217,64 @@ mod tests {
             assert!(approx_eq(&r, &[1.0, 2.0, 3.0], 1e-10));
         }
     }
+
+    mod normalize_tests {
+        use super::*;
+
+        #[test]
+        fn returns_unit_length_vector() {
+            let r = normalize([3.0, 4.0, 0.0]);
+            let len = (r[0] * r[0] + r[1] * r[1] + r[2] * r[2]).sqrt();
+            assert!((len - 1.0).abs() < 1e-10);
+        }
+
+        #[test]
+        fn preserves_direction() {
+            let r = normalize([0.0, 0.0, 5.0]);
+            assert!(approx_eq(&r, &[0.0, 0.0, 1.0], 1e-10));
+        }
+
+        #[test]
+        fn returns_zero_for_near_zero_input() {
+            let r = normalize([0.0, 0.0, 0.0]);
+            assert!(approx_eq(&r, &[0.0, 0.0, 0.0], 1e-10));
+        }
+    }
+
+    mod depth_range {
+        use super::*;
+
+        #[test]
+        fn nearest_z_normalizes_to_one() {
+            let dr = DepthRange::new(-5.0, 5.0);
+            assert!((dr.normalize(-5.0) - 1.0).abs() < 1e-10);
+        }
+
+        #[test]
+        fn farthest_z_normalizes_to_zero() {
+            let dr = DepthRange::new(-5.0, 5.0);
+            assert!(dr.normalize(5.0).abs() < 1e-10);
+        }
+
+        #[test]
+        fn midpoint_z_normalizes_to_half() {
+            let dr = DepthRange::new(-5.0, 5.0);
+            assert!((dr.normalize(0.0) - 0.5).abs() < 1e-10);
+        }
+
+        #[test]
+        fn degenerate_range_does_not_divide_by_zero() {
+            let dr = DepthRange::new(3.0, 3.0);
+            let result = dr.normalize(3.0);
+            assert!(result.is_finite());
+        }
+
+        #[test]
+        fn from_z_iter_matches_manual_construction() {
+            let values = vec![-2.0, 0.0, 3.0, 1.0];
+            let dr = DepthRange::from_z_iter(values.into_iter());
+            assert!((dr.normalize(-2.0) - 1.0).abs() < 1e-10);
+            assert!(dr.normalize(3.0).abs() < 1e-10);
+        }
+    }
 }

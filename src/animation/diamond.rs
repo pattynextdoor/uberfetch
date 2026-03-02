@@ -69,8 +69,6 @@ impl Animation for Diamond {
         let base_scale = vw.min(vh) * 0.7 * pulse;
         let distance = 4.0 * base_scale;
 
-        // Transform vertices in 3D, keeping z for depth-based coloring.
-        // Stack arrays — VERTICES is [Vec3; 6], so .map() yields [T; 6] with zero heap alloc.
         let transformed: [Vec3; 6] = VERTICES.map(|v| {
             let v = math::scale(v, base_scale);
             let v = math::rotate_x(v, self.angle_x);
@@ -82,7 +80,6 @@ impl Animation for Diamond {
         let visible = projected.map(|p| math::is_visible(p, vw, vh));
         let depth_range = DepthRange::from_z_iter(transformed.iter().map(|v| v[2]));
 
-        // Draw edges — skip if either vertex is outside the viewport
         for (idx, &(i, j)) in EDGES.iter().enumerate() {
             if !visible[i] || !visible[j] {
                 continue;
@@ -106,7 +103,6 @@ impl Animation for Diamond {
             });
         }
 
-        // Vertex dots with depth-based brightness
         for (i, (&vis, proj)) in visible.iter().zip(projected.iter()).enumerate() {
             if !vis {
                 continue;

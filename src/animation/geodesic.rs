@@ -215,7 +215,6 @@ impl Animation for Geodesic {
             });
         }
 
-        // Vertex dots with depth-based brightness
         for (i, (&vis, proj)) in visible.iter().zip(projected.iter()).enumerate() {
             if !vis {
                 continue;

@@ -1,7 +1,19 @@
+use std::process::Command;
+
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+
+/// Run an external command and return its trimmed stdout.
+fn cmd_output(program: &str, args: &[&str]) -> Option<String> {
+    Command::new(program)
+        .args(args)
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+}
 
 /// System information collected at startup.
 pub struct SystemInfo {

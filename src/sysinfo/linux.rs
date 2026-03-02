@@ -1,9 +1,7 @@
-// Linux system information collection
-
 use std::fs;
 use std::process::Command;
 
-use super::SystemInfo;
+use super::{cmd_output, SystemInfo};
 
 pub fn collect() -> SystemInfo {
     SystemInfo {
@@ -20,15 +18,6 @@ pub fn collect() -> SystemInfo {
 
 fn read_file(path: &str) -> Option<String> {
     fs::read_to_string(path).ok()
-}
-
-fn cmd_output(program: &str, args: &[&str]) -> Option<String> {
-    Command::new(program)
-        .args(args)
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_string())
 }
 
 fn get_hostname() -> String {
@@ -61,7 +50,11 @@ fn get_uptime() -> String {
     read_file("/proc/uptime")
         .and_then(|content| {
             let secs: f64 = content.split_whitespace().next()?.parse().ok()?;
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "uptime seconds always fit in u64; negative values clamped to 0"
+            )]
             let secs_u64 = secs.max(0.0) as u64;
             Some(super::format_uptime(secs_u64))
         })

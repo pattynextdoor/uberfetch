@@ -108,8 +108,6 @@ impl Animation for Hypercube {
         let distance_4d = 3.0;
         let distance_3d = 4.0;
 
-        // Transform 4D → 3D, keeping the intermediate 3D result for depth.
-        // Stack arrays — self.vertices is [Vec4; 16], so .map() yields [T; 16].
         let transformed_3d: [Vec3; 16] = self.vertices.map(|v| {
             let v = [
                 v[0] * base_scale,
@@ -161,7 +159,6 @@ impl Animation for Hypercube {
             });
         }
 
-        // Vertex dots with depth-based brightness
         for (i, (&vis, proj)) in visible.iter().zip(projected.iter()).enumerate() {
             if !vis {
                 continue;

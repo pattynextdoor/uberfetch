@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
 description = "A neofetch alternative with esoteric terminal animations"
+license = "MIT"
+repository = "https://github.com/pattynextdoor/uberfetch"
+homepage = "https://github.com/pattynextdoor/uberfetch"
+readme = "README.md"
+keywords = ["neofetch", "system-info", "terminal", "animation", "cli"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 ratatui = { version = "0.29", features = ["all-widgets"] }

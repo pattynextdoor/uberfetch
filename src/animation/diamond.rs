@@ -1,7 +1,7 @@
 use ratatui::style::Color;
 use ratatui::widgets::canvas::{Context, Points};
 
-use super::math::{self, Vec3};
+use super::math::{self, DepthRange, Vec3};
 use super::Animation;
 
 const VERTICES: [Vec3; 6] = [
@@ -69,34 +69,18 @@ impl Animation for Diamond {
         let base_scale = vw.min(vh) * 0.7 * pulse;
         let distance = 4.0 * base_scale;
 
-        // Transform vertices in 3D, keeping z for depth-based coloring
-        let transformed: Vec<Vec3> = VERTICES
-            .iter()
-            .map(|&v| {
-                let v = math::scale(v, base_scale);
-                let v = math::rotate_x(v, self.angle_x);
-                let v = math::rotate_y(v, self.angle_y);
-                math::rotate_z(v, self.angle_z)
-            })
-            .collect();
+        // Transform vertices in 3D, keeping z for depth-based coloring.
+        // Stack arrays — VERTICES is [Vec3; 6], so .map() yields [T; 6] with zero heap alloc.
+        let transformed: [Vec3; 6] = VERTICES.map(|v| {
+            let v = math::scale(v, base_scale);
+            let v = math::rotate_x(v, self.angle_x);
+            let v = math::rotate_y(v, self.angle_y);
+            math::rotate_z(v, self.angle_z)
+        });
 
-        let projected: Vec<[f64; 2]> = transformed
-            .iter()
-            .map(|&v| math::project(v, distance))
-            .collect();
-
-        let visible: Vec<bool> = projected
-            .iter()
-            .map(|p| math::is_visible(*p, vw, vh))
-            .collect();
-
-        // Z-range for depth normalization
-        let (z_min, z_max) = transformed
-            .iter()
-            .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), v| {
-                (min.min(v[2]), max.max(v[2]))
-            });
-        let z_range = (z_max - z_min).max(0.001);
+        let projected = transformed.map(|v| math::project(v, distance));
+        let visible = projected.map(|p| math::is_visible(p, vw, vh));
+        let depth_range = DepthRange::from_z_iter(transformed.iter().map(|v| v[2]));
 
         // Draw edges — skip if either vertex is outside the viewport
         for (idx, &(i, j)) in EDGES.iter().enumerate() {
@@ -105,8 +89,7 @@ impl Animation for Diamond {
             }
 
             let avg_z = f64::midpoint(transformed[i][2], transformed[j][2]);
-            let depth = 1.0 - (avg_z - z_min) / z_range;
-            let depth_brightness = 0.35 + 0.65 * depth;
+            let depth_brightness = 0.35 + 0.65 * depth_range.normalize(avg_z);
 
             let shimmer =
                 ((self.time * 1.5 + idx as f64 * 0.5).sin() * 0.15 + 0.85).clamp(0.4, 1.0);
@@ -128,8 +111,7 @@ impl Animation for Diamond {
             if !vis {
                 continue;
             }
-            let depth = 1.0 - (transformed[i][2] - z_min) / z_range;
-            let b = ((0.5 + 0.5 * depth) * 255.0) as u8;
+            let b = ((0.5 + 0.5 * depth_range.normalize(transformed[i][2])) * 255.0) as u8;
             ctx.draw(&Points {
                 coords: &[(proj[0], proj[1])],
                 color: Color::Rgb(b, b, (f64::from(b) * 0.9) as u8),

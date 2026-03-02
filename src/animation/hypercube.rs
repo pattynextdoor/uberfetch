@@ -1,7 +1,7 @@
 use ratatui::style::Color;
 use ratatui::widgets::canvas::{Context, Points};
 
-use super::math::{self, Vec3, Vec4};
+use super::math::{self, DepthRange, Vec3, Vec4};
 use super::Animation;
 
 /// Generate the 16 vertices of a unit tesseract centered at the origin.
@@ -22,21 +22,48 @@ fn tesseract_vertices() -> [Vec4; 16] {
     verts
 }
 
-/// Generate the 32 edges of a tesseract.
+/// The 32 edges of a tesseract.
 ///
 /// Two vertices are connected if and only if they differ in exactly one
 /// coordinate — i.e. their XOR has exactly one bit set.
-fn tesseract_edges() -> Vec<(usize, usize)> {
-    let mut edges = Vec::new();
-    for i in 0u32..16 {
-        for j in (i + 1)..16 {
-            if (i ^ j).is_power_of_two() {
-                edges.push((i as usize, j as usize));
-            }
-        }
-    }
-    edges
-}
+const EDGES: [(usize, usize); 32] = [
+    // x-edges (bit 0)
+    (0, 1),
+    (2, 3),
+    (4, 5),
+    (6, 7),
+    (8, 9),
+    (10, 11),
+    (12, 13),
+    (14, 15),
+    // y-edges (bit 1)
+    (0, 2),
+    (1, 3),
+    (4, 6),
+    (5, 7),
+    (8, 10),
+    (9, 11),
+    (12, 14),
+    (13, 15),
+    // z-edges (bit 2)
+    (0, 4),
+    (1, 5),
+    (2, 6),
+    (3, 7),
+    (8, 12),
+    (9, 13),
+    (10, 14),
+    (11, 15),
+    // w-edges (bit 3)
+    (0, 8),
+    (1, 9),
+    (2, 10),
+    (3, 11),
+    (4, 12),
+    (5, 13),
+    (6, 14),
+    (7, 15),
+];
 
 /// 4D tesseract (hypercube) rotating through hyperplanes.
 ///
@@ -49,7 +76,6 @@ pub struct Hypercube {
     angle_yz: f64,
     angle_xz: f64,
     vertices: [Vec4; 16],
-    edges: Vec<(usize, usize)>,
 }
 
 impl Hypercube {
@@ -59,7 +85,6 @@ impl Hypercube {
             angle_yz: 0.0,
             angle_xz: 0.0,
             vertices: tesseract_vertices(),
-            edges: tesseract_edges(),
         }
     }
 }
@@ -83,44 +108,26 @@ impl Animation for Hypercube {
         let distance_4d = 3.0;
         let distance_3d = 4.0;
 
-        // Transform 4D → 3D, keeping the intermediate 3D result for depth
-        let transformed_3d: Vec<Vec3> = self
-            .vertices
-            .iter()
-            .map(|v| {
-                let v = [
-                    v[0] * base_scale,
-                    v[1] * base_scale,
-                    v[2] * base_scale,
-                    v[3] * base_scale,
-                ];
-                let v = math::rotate_xw(v, self.angle_xw);
-                let v = math::rotate_yz(v, self.angle_yz);
-                let v = math::rotate_xz(v, self.angle_xz);
-                math::project_4d_to_3d(v, distance_4d * base_scale)
-            })
-            .collect();
+        // Transform 4D → 3D, keeping the intermediate 3D result for depth.
+        // Stack arrays — self.vertices is [Vec4; 16], so .map() yields [T; 16].
+        let transformed_3d: [Vec3; 16] = self.vertices.map(|v| {
+            let v = [
+                v[0] * base_scale,
+                v[1] * base_scale,
+                v[2] * base_scale,
+                v[3] * base_scale,
+            ];
+            let v = math::rotate_xw(v, self.angle_xw);
+            let v = math::rotate_yz(v, self.angle_yz);
+            let v = math::rotate_xz(v, self.angle_xz);
+            math::project_4d_to_3d(v, distance_4d * base_scale)
+        });
 
-        // Project 3D → 2D
-        let projected: Vec<[f64; 2]> = transformed_3d
-            .iter()
-            .map(|&v| math::project(v, distance_3d * base_scale))
-            .collect();
+        let projected = transformed_3d.map(|v| math::project(v, distance_3d * base_scale));
+        let visible = projected.map(|p| math::is_visible(p, vw, vh));
+        let depth_range = DepthRange::from_z_iter(transformed_3d.iter().map(|v| v[2]));
 
-        let visible: Vec<bool> = projected
-            .iter()
-            .map(|p| math::is_visible(*p, vw, vh))
-            .collect();
-
-        // Z-range for depth-based brightness
-        let (z_min, z_max) = transformed_3d
-            .iter()
-            .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), v| {
-                (min.min(v[2]), max.max(v[2]))
-            });
-        let z_range = (z_max - z_min).max(0.001);
-
-        for &(i, j) in &self.edges {
+        for &(i, j) in &EDGES {
             if !visible[i] || !visible[j] {
                 continue;
             }
@@ -137,8 +144,7 @@ impl Animation for Hypercube {
 
             // Modulate color brightness by depth (closer = brighter)
             let avg_z = f64::midpoint(transformed_3d[i][2], transformed_3d[j][2]);
-            let depth = 1.0 - (avg_z - z_min) / z_range;
-            let brightness = 0.3 + 0.7 * depth;
+            let brightness = 0.3 + 0.7 * depth_range.normalize(avg_z);
 
             let color = Color::Rgb(
                 (base_color.0 * brightness) as u8,
@@ -160,8 +166,7 @@ impl Animation for Hypercube {
             if !vis {
                 continue;
             }
-            let depth = 1.0 - (transformed_3d[i][2] - z_min) / z_range;
-            let b = ((0.4 + 0.6 * depth) * 255.0) as u8;
+            let b = ((0.4 + 0.6 * depth_range.normalize(transformed_3d[i][2])) * 255.0) as u8;
             ctx.draw(&Points {
                 coords: &[(proj[0], proj[1])],
                 color: Color::Rgb(b, b, b),

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use ratatui::style::Color;
 use ratatui::widgets::canvas::{Context, Points};
 
-use super::math::{self, Vec3};
+use super::math::{self, DepthRange, Vec3};
 use super::Animation;
 
 fn icosahedron_vertices() -> Vec<Vec3> {
@@ -22,12 +22,7 @@ fn icosahedron_vertices() -> Vec<Vec3> {
         [-phi, 0.0, -1.0],
         [-phi, 0.0, 1.0],
     ];
-    raw.into_iter()
-        .map(|v| {
-            let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
-            [v[0] / len, v[1] / len, v[2] / len]
-        })
-        .collect()
+    raw.into_iter().map(math::normalize).collect()
 }
 
 fn icosahedron_faces() -> Vec<[usize; 3]> {
@@ -65,15 +60,13 @@ fn get_midpoint(
     if let Some(&idx) = cache.get(&key) {
         return idx;
     }
-    let mid = [
+    let mid = math::normalize([
         f64::midpoint(verts[a][0], verts[b][0]),
         f64::midpoint(verts[a][1], verts[b][1]),
         f64::midpoint(verts[a][2], verts[b][2]),
-    ];
-    let len = (mid[0] * mid[0] + mid[1] * mid[1] + mid[2] * mid[2]).sqrt();
-    let normalized = [mid[0] / len, mid[1] / len, mid[2] / len];
+    ]);
     let idx = verts.len();
-    verts.push(normalized);
+    verts.push(mid);
     cache.insert(key, idx);
     idx
 }
@@ -195,12 +188,7 @@ impl Animation for Geodesic {
             .map(|p| math::is_visible(*p, vw, vh))
             .collect();
 
-        let (z_min, z_max) = transformed
-            .iter()
-            .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), v| {
-                (min.min(v[2]), max.max(v[2]))
-            });
-        let z_range = (z_max - z_min).max(0.001);
+        let depth_range = DepthRange::from_z_iter(transformed.iter().map(|v| v[2]));
 
         for &(i, j) in &self.edges {
             if !visible[i] || !visible[j] {
@@ -208,8 +196,7 @@ impl Animation for Geodesic {
             }
 
             let avg_z = f64::midpoint(transformed[i][2], transformed[j][2]);
-            let depth = 1.0 - (avg_z - z_min) / z_range;
-            let depth_brightness = 0.25 + 0.75 * depth;
+            let depth_brightness = 0.25 + 0.75 * depth_range.normalize(avg_z);
 
             let avg_phase = (i + j) as f64 * 0.02;
             let shimmer = ((self.time * 1.5 + avg_phase).sin() * 0.15 + 0.85).clamp(0.3, 1.0);
@@ -233,8 +220,7 @@ impl Animation for Geodesic {
             if !vis {
                 continue;
             }
-            let depth = 1.0 - (transformed[i][2] - z_min) / z_range;
-            let b = ((0.4 + 0.6 * depth) * 255.0) as u8;
+            let b = ((0.4 + 0.6 * depth_range.normalize(transformed[i][2])) * 255.0) as u8;
             ctx.draw(&Points {
                 coords: &[(proj[0], proj[1])],
                 color: Color::Rgb((f64::from(b) * 0.5) as u8, b, (f64::from(b) * 0.85) as u8),

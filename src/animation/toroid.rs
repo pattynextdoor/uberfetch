@@ -3,7 +3,7 @@ use std::f64::consts::TAU;
 use ratatui::style::Color;
 use ratatui::widgets::canvas::{Context, Points};
 
-use super::math;
+use super::math::{self, DepthRange};
 use super::Animation;
 
 const NUM_PARTICLES: usize = 1500;
@@ -65,37 +65,34 @@ impl Animation for Toroid {
         let minor = major * 0.4;
         let distance = 4.0 * major;
 
-        // Compute 3D position, project to 2D, and track z for depth
-        let data: Vec<([f64; 2], f64)> = self
-            .particles
-            .iter()
-            .map(|p| {
-                let r = major + minor * p.phi.cos();
-                let point = [r * p.theta.cos(), minor * p.phi.sin(), r * p.theta.sin()];
-                let point = math::rotate_x(point, self.angle_x);
-                let point = math::rotate_y(point, self.angle_y);
-                let z = point[2];
-                let proj = math::project(point, distance);
-                (proj, z)
-            })
-            .collect();
+        // Project all particles, tracking z-range in a single pass
+        let mut data = Vec::with_capacity(NUM_PARTICLES);
+        let mut z_min = f64::INFINITY;
+        let mut z_max = f64::NEG_INFINITY;
+        for p in &self.particles {
+            let r = major + minor * p.phi.cos();
+            let point = [r * p.theta.cos(), minor * p.phi.sin(), r * p.theta.sin()];
+            let point = math::rotate_x(point, self.angle_x);
+            let point = math::rotate_y(point, self.angle_y);
+            let z = point[2];
+            z_min = z_min.min(z);
+            z_max = z_max.max(z);
+            let proj = math::project(point, distance);
+            data.push((proj, z));
+        }
+        let depth_range = DepthRange::new(z_min, z_max);
 
-        // Z-range for depth normalization
-        let (z_min, z_max) = data
-            .iter()
-            .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), &(_, z)| {
-                (min.min(z), max.max(z))
-            });
-        let z_range = (z_max - z_min).max(0.001);
-
-        // Bucket particles by depth layer for back-to-front drawing
+        // Bucket visible particles by depth layer for back-to-front drawing
         let mut near = Vec::new();
         let mut mid_near = Vec::new();
         let mut mid_far = Vec::new();
         let mut far = Vec::new();
 
         for &(proj, z) in &data {
-            let depth = 1.0 - (z - z_min) / z_range;
+            if !math::is_visible(proj, vw, vh) {
+                continue;
+            }
+            let depth = depth_range.normalize(z);
             let coord = (proj[0], proj[1]);
 
             if depth > 0.75 {

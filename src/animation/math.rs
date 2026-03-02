@@ -70,9 +70,47 @@ pub fn project_4d_to_3d(p: Vec4, distance: f64) -> Vec3 {
     [p[0] * factor, p[1] * factor, p[2] * factor]
 }
 
+/// Normalize a Vec3 to unit length. Returns the zero vector for near-zero inputs.
+pub fn normalize(v: Vec3) -> Vec3 {
+    let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    if len < 1e-10 {
+        return [0.0, 0.0, 0.0];
+    }
+    [v[0] / len, v[1] / len, v[2] / len]
+}
+
 /// Check whether a projected 2D point is within the visible viewport.
 pub fn is_visible(point: Vec2, half_w: f64, half_h: f64) -> bool {
     point[0].abs() <= half_w && point[1].abs() <= half_h
+}
+
+/// Precomputed z-range for normalizing depth values across a set of vertices.
+pub struct DepthRange {
+    z_min: f64,
+    z_range: f64,
+}
+
+impl DepthRange {
+    /// Build from an explicit min/max pair (useful when tracking z during a loop).
+    pub fn new(z_min: f64, z_max: f64) -> Self {
+        Self {
+            z_min,
+            z_range: (z_max - z_min).max(0.001),
+        }
+    }
+
+    /// Build by scanning an iterator of z values.
+    pub fn from_z_iter(iter: impl Iterator<Item = f64>) -> Self {
+        let (z_min, z_max) = iter.fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), z| {
+            (min.min(z), max.max(z))
+        });
+        Self::new(z_min, z_max)
+    }
+
+    /// Map a z value to 0.0..=1.0 where 1.0 is nearest to the camera.
+    pub fn normalize(&self, z: f64) -> f64 {
+        1.0 - (z - self.z_min) / self.z_range
+    }
 }
 
 #[cfg(test)]

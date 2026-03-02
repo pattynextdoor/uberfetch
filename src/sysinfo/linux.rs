@@ -61,32 +61,35 @@ fn get_uptime() -> String {
     read_file("/proc/uptime")
         .and_then(|content| {
             let secs: f64 = content.split_whitespace().next()?.parse().ok()?;
-            Some(super::format_uptime(secs as u64))
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let secs_u64 = secs.max(0.0) as u64;
+            Some(super::format_uptime(secs_u64))
         })
         .unwrap_or_else(|| "Unknown".into())
 }
 
 fn get_cpu() -> String {
-    read_file("/proc/cpuinfo")
-        .map(|content| {
+    read_file("/proc/cpuinfo").map_or_else(
+        || "Unknown".into(),
+        |content| {
             let model = content
                 .lines()
                 .find(|l| l.starts_with("model name"))
                 .and_then(|l| l.split(':').nth(1))
-                .map(|s| s.trim().to_string())
-                .unwrap_or_else(|| "Unknown".into());
+                .map_or_else(|| "Unknown".into(), |s| s.trim().to_string());
             let cores = content
                 .lines()
                 .filter(|l| l.starts_with("processor"))
                 .count();
             format!("{model} ({cores} cores)")
-        })
-        .unwrap_or_else(|| "Unknown".into())
+        },
+    )
 }
 
 fn get_memory() -> String {
-    read_file("/proc/meminfo")
-        .map(|content| {
+    read_file("/proc/meminfo").map_or_else(
+        || "Unknown".into(),
+        |content| {
             let parse_kb = |key: &str| -> u64 {
                 content
                     .lines()
@@ -98,27 +101,27 @@ fn get_memory() -> String {
             let available_kb = parse_kb("MemAvailable:");
             let used_kb = total_kb.saturating_sub(available_kb);
             super::format_memory(used_kb * 1024, total_kb * 1024)
-        })
-        .unwrap_or_else(|| "Unknown".into())
+        },
+    )
 }
 
 fn get_shell() -> String {
-    std::env::var("SHELL")
-        .ok()
-        .map(|s| {
+    std::env::var("SHELL").ok().map_or_else(
+        || "Unknown".into(),
+        |s| {
             let name = s.rsplit('/').next().unwrap_or(&s).to_string();
             let version = Command::new(&s)
                 .arg("--version")
                 .output()
                 .ok()
                 .and_then(|o| String::from_utf8(o.stdout).ok())
-                .and_then(|v| v.lines().next().map(|l| l.to_string()));
+                .and_then(|v| v.lines().next().map(ToString::to_string));
             match version {
                 Some(v) if v.contains(&name) => v,
                 _ => name,
             }
-        })
-        .unwrap_or_else(|| "Unknown".into())
+        },
+    )
 }
 
 fn get_terminal() -> String {

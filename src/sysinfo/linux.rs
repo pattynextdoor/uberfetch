@@ -1,16 +1,122 @@
 // Linux system information collection
 
+use std::fs;
+use std::process::Command;
+
 use super::SystemInfo;
 
 pub fn collect() -> SystemInfo {
     SystemInfo {
-        hostname: String::new(),
-        os: String::new(),
-        kernel: String::new(),
-        uptime: String::new(),
-        cpu: String::new(),
-        memory: String::new(),
-        shell: String::new(),
-        terminal: String::new(),
+        hostname: get_hostname(),
+        os: get_os(),
+        kernel: get_kernel(),
+        uptime: get_uptime(),
+        cpu: get_cpu(),
+        memory: get_memory(),
+        shell: get_shell(),
+        terminal: get_terminal(),
     }
+}
+
+fn read_file(path: &str) -> Option<String> {
+    fs::read_to_string(path).ok()
+}
+
+fn cmd_output(program: &str, args: &[&str]) -> Option<String> {
+    Command::new(program)
+        .args(args)
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+}
+
+fn get_hostname() -> String {
+    hostname::get()
+        .ok()
+        .and_then(|h| h.into_string().ok())
+        .unwrap_or_else(|| "Unknown".into())
+}
+
+fn get_os() -> String {
+    read_file("/etc/os-release")
+        .and_then(|content| {
+            content
+                .lines()
+                .find(|l| l.starts_with("PRETTY_NAME="))
+                .map(|l| l.trim_start_matches("PRETTY_NAME=").trim_matches('"').to_string())
+        })
+        .unwrap_or_else(|| "Linux".into())
+}
+
+fn get_kernel() -> String {
+    cmd_output("uname", &["-r"]).unwrap_or_else(|| "Unknown".into())
+}
+
+fn get_uptime() -> String {
+    read_file("/proc/uptime")
+        .and_then(|content| {
+            let secs: f64 = content.split_whitespace().next()?.parse().ok()?;
+            Some(super::format_uptime(secs as u64))
+        })
+        .unwrap_or_else(|| "Unknown".into())
+}
+
+fn get_cpu() -> String {
+    read_file("/proc/cpuinfo")
+        .map(|content| {
+            let model = content
+                .lines()
+                .find(|l| l.starts_with("model name"))
+                .and_then(|l| l.split(':').nth(1))
+                .map(|s| s.trim().to_string())
+                .unwrap_or_else(|| "Unknown".into());
+            let cores = content
+                .lines()
+                .filter(|l| l.starts_with("processor"))
+                .count();
+            format!("{model} ({cores} cores)")
+        })
+        .unwrap_or_else(|| "Unknown".into())
+}
+
+fn get_memory() -> String {
+    read_file("/proc/meminfo")
+        .map(|content| {
+            let parse_kb = |key: &str| -> u64 {
+                content
+                    .lines()
+                    .find(|l| l.starts_with(key))
+                    .and_then(|l| l.split_whitespace().nth(1)?.parse().ok())
+                    .unwrap_or(0)
+            };
+            let total_kb = parse_kb("MemTotal:");
+            let available_kb = parse_kb("MemAvailable:");
+            let used_kb = total_kb.saturating_sub(available_kb);
+            super::format_memory(used_kb * 1024, total_kb * 1024)
+        })
+        .unwrap_or_else(|| "Unknown".into())
+}
+
+fn get_shell() -> String {
+    std::env::var("SHELL")
+        .ok()
+        .map(|s| {
+            let name = s.rsplit('/').next().unwrap_or(&s).to_string();
+            let version = Command::new(&s)
+                .arg("--version")
+                .output()
+                .ok()
+                .and_then(|o| String::from_utf8(o.stdout).ok())
+                .and_then(|v| v.lines().next().map(|l| l.to_string()));
+            match version {
+                Some(v) if v.contains(&name) => v,
+                _ => name,
+            }
+        })
+        .unwrap_or_else(|| "Unknown".into())
+}
+
+fn get_terminal() -> String {
+    std::env::var("TERM_PROGRAM").unwrap_or_else(|_| "Unknown".into())
 }

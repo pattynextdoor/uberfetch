@@ -1,3 +1,4 @@
+pub mod math;
 mod diamond;
 
 use ratatui::widgets::canvas::Context;

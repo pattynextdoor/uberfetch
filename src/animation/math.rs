@@ -70,6 +70,11 @@ pub fn project_4d_to_3d(p: Vec4, distance: f64) -> Vec3 {
     [p[0] * factor, p[1] * factor, p[2] * factor]
 }
 
+/// Check whether a projected 2D point is within the visible viewport.
+pub fn is_visible(point: Vec2, half_w: f64, half_h: f64) -> bool {
+    point[0].abs() <= half_w && point[1].abs() <= half_h
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

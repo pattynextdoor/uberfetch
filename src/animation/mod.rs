@@ -1,7 +1,7 @@
-pub mod math;
 pub mod diamond;
 pub mod geodesic;
 pub mod hypercube;
+pub mod math;
 pub mod toroid;
 
 use ratatui::widgets::canvas::Context;
@@ -11,7 +11,8 @@ pub trait Animation {
     /// Advance the animation state by dt seconds.
     fn update(&mut self, dt: f32);
     /// Render the current frame into a ratatui Canvas context.
-    fn draw(&self, ctx: &mut Context);
+    /// `viewport` is `(half_width, half_height)` — the canvas coordinate bounds.
+    fn draw(&self, ctx: &mut Context, viewport: (f64, f64));
     /// Human-readable name for CLI selection.
     #[allow(dead_code)]
     fn name(&self) -> &'static str;

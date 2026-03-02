@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use ratatui::style::Color;
-use ratatui::widgets::canvas::Context;
+use ratatui::widgets::canvas::{Context, Points};
 
 use super::math::{self, Vec3};
 use super::Animation;
@@ -55,42 +55,6 @@ fn icosahedron_faces() -> Vec<[usize; 3]> {
     ]
 }
 
-fn subdivide_icosahedron() -> (Vec<Vec3>, Vec<(usize, usize)>) {
-    let base_verts = icosahedron_vertices();
-    let faces = icosahedron_faces();
-
-    let mut verts = base_verts;
-    let mut edge_set = HashSet::new();
-    let mut midpoint_cache = HashMap::new();
-
-    for face in &faces {
-        let a = face[0];
-        let b = face[1];
-        let c = face[2];
-        let ab = get_midpoint(a, b, &mut verts, &mut midpoint_cache);
-        let bc = get_midpoint(b, c, &mut verts, &mut midpoint_cache);
-        let ca = get_midpoint(c, a, &mut verts, &mut midpoint_cache);
-
-        for &(i, j) in &[
-            (a, ab),
-            (ab, b),
-            (b, bc),
-            (bc, c),
-            (c, ca),
-            (ca, a),
-            (ab, bc),
-            (bc, ca),
-            (ca, ab),
-        ] {
-            let edge = if i < j { (i, j) } else { (j, i) };
-            edge_set.insert(edge);
-        }
-    }
-
-    let edges: Vec<(usize, usize)> = edge_set.into_iter().collect();
-    (verts, edges)
-}
-
 fn get_midpoint(
     a: usize,
     b: usize,
@@ -114,7 +78,57 @@ fn get_midpoint(
     idx
 }
 
+/// Subdivide each triangular face into 4 smaller triangles by adding
+/// edge midpoints, then project new vertices onto the unit sphere.
+fn subdivide_mesh(
+    verts: &mut Vec<Vec3>,
+    faces: &[[usize; 3]],
+    cache: &mut HashMap<(usize, usize), usize>,
+) -> Vec<[usize; 3]> {
+    let mut new_faces = Vec::new();
+    for face in faces {
+        let a = face[0];
+        let b = face[1];
+        let c = face[2];
+        let ab = get_midpoint(a, b, verts, cache);
+        let bc = get_midpoint(b, c, verts, cache);
+        let ca = get_midpoint(c, a, verts, cache);
+
+        new_faces.push([a, ab, ca]);
+        new_faces.push([b, bc, ab]);
+        new_faces.push([c, ca, bc]);
+        new_faces.push([ab, bc, ca]);
+    }
+    new_faces
+}
+
+/// Build a geodesic sphere by subdividing an icosahedron `levels` times.
+/// Returns (vertices, edges).
+fn build_geodesic(levels: usize) -> (Vec<Vec3>, Vec<(usize, usize)>) {
+    let mut verts = icosahedron_vertices();
+    let mut faces = icosahedron_faces();
+
+    for _ in 0..levels {
+        let mut cache = HashMap::new();
+        faces = subdivide_mesh(&mut verts, &faces, &mut cache);
+    }
+
+    // Extract unique edges from final face list
+    let mut edge_set = HashSet::new();
+    for face in &faces {
+        for &(i, j) in &[(face[0], face[1]), (face[1], face[2]), (face[2], face[0])] {
+            let edge = if i < j { (i, j) } else { (j, i) };
+            edge_set.insert(edge);
+        }
+    }
+
+    (verts, edge_set.into_iter().collect())
+}
+
 /// Breathing geodesic sphere animation.
+///
+/// Two levels of icosahedron subdivision (~162 vertices, ~480 edges)
+/// for a dense, high-fidelity wireframe.
 pub struct Geodesic {
     base_vertices: Vec<Vec3>,
     edges: Vec<(usize, usize)>,
@@ -125,7 +139,7 @@ pub struct Geodesic {
 
 impl Geodesic {
     pub fn new() -> Self {
-        let (verts, edges) = subdivide_icosahedron();
+        let (verts, edges) = build_geodesic(2);
         Self {
             base_vertices: verts,
             edges,
@@ -150,30 +164,60 @@ impl Animation for Geodesic {
         clippy::cast_sign_loss,
         reason = "animation indices are small; color values are clamped to 0-255"
     )]
-    fn draw(&self, ctx: &mut Context) {
-        let base_scale = 25.0;
+    fn draw(&self, ctx: &mut Context, viewport: (f64, f64)) {
+        let (vw, vh) = viewport;
+        let base_scale = vw.min(vh) * 0.7;
         let distance = 4.0 * base_scale;
 
-        let projected: Vec<[f64; 2]> = self
+        // Transform each vertex with per-vertex breathing phase.
+        // Phase factor is reduced for the denser mesh so ~1 wave cycle
+        // spans all vertices, keeping the organic feel without chaos.
+        let transformed: Vec<Vec3> = self
             .base_vertices
             .iter()
             .enumerate()
             .map(|(i, &v)| {
-                let phase = i as f64 * 0.15;
-                let breath = 1.0 + 0.15 * (self.time * 2.0 + phase).sin();
+                let phase = i as f64 * 0.04;
+                let breath = 1.0 + 0.08 * (self.time * 2.0 + phase).sin();
                 let v = math::scale(v, base_scale * breath);
                 let v = math::rotate_x(v, self.angle_x);
-                let v = math::rotate_y(v, self.angle_y);
-                math::project(v, distance)
+                math::rotate_y(v, self.angle_y)
             })
             .collect();
 
+        let projected: Vec<[f64; 2]> = transformed
+            .iter()
+            .map(|&v| math::project(v, distance))
+            .collect();
+
+        let visible: Vec<bool> = projected
+            .iter()
+            .map(|p| math::is_visible(*p, vw, vh))
+            .collect();
+
+        let (z_min, z_max) = transformed
+            .iter()
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), v| {
+                (min.min(v[2]), max.max(v[2]))
+            });
+        let z_range = (z_max - z_min).max(0.001);
+
         for &(i, j) in &self.edges {
-            let avg_phase = (i + j) as f64 * 0.075;
-            let brightness = ((self.time * 1.5 + avg_phase).sin() * 0.3 + 0.7).clamp(0.3, 1.0);
+            if !visible[i] || !visible[j] {
+                continue;
+            }
+
+            let avg_z = f64::midpoint(transformed[i][2], transformed[j][2]);
+            let depth = 1.0 - (avg_z - z_min) / z_range;
+            let depth_brightness = 0.25 + 0.75 * depth;
+
+            let avg_phase = (i + j) as f64 * 0.02;
+            let shimmer = ((self.time * 1.5 + avg_phase).sin() * 0.15 + 0.85).clamp(0.3, 1.0);
+            let brightness = depth_brightness * shimmer;
+
             let g = (brightness * 255.0) as u8;
-            let b = (brightness * 200.0) as u8;
-            let color = Color::Rgb((f64::from(g) * 0.6) as u8, g, b);
+            let b = (brightness * 220.0) as u8;
+            let color = Color::Rgb((f64::from(g) * 0.5) as u8, g, b);
 
             ctx.draw(&ratatui::widgets::canvas::Line {
                 x1: projected[i][0],
@@ -181,6 +225,19 @@ impl Animation for Geodesic {
                 x2: projected[j][0],
                 y2: projected[j][1],
                 color,
+            });
+        }
+
+        // Vertex dots with depth-based brightness
+        for (i, (&vis, proj)) in visible.iter().zip(projected.iter()).enumerate() {
+            if !vis {
+                continue;
+            }
+            let depth = 1.0 - (transformed[i][2] - z_min) / z_range;
+            let b = ((0.4 + 0.6 * depth) * 255.0) as u8;
+            ctx.draw(&Points {
+                coords: &[(proj[0], proj[1])],
+                color: Color::Rgb((f64::from(b) * 0.5) as u8, b, (f64::from(b) * 0.85) as u8),
             });
         }
     }

@@ -78,26 +78,25 @@ fn get_memory() -> String {
         .and_then(|s| s.parse().ok())
         .unwrap_or(16384);
 
-    let used_bytes = cmd_output("vm_stat", &[])
-        .map_or(0, |raw| {
-            let parse_line = |key: &str| -> u64 {
-                raw.lines()
-                    .find(|l| l.contains(key))
-                    .and_then(|l| {
-                        l.split(':')
-                            .nth(1)?
-                            .trim()
-                            .trim_end_matches('.')
-                            .parse()
-                            .ok()
-                    })
-                    .unwrap_or(0)
-            };
-            let active = parse_line("Pages active");
-            let wired = parse_line("Pages wired down");
-            let compressed = parse_line("Pages occupied by compressor");
-            (active + wired + compressed) * page_size
-        });
+    let used_bytes = cmd_output("vm_stat", &[]).map_or(0, |raw| {
+        let parse_line = |key: &str| -> u64 {
+            raw.lines()
+                .find(|l| l.contains(key))
+                .and_then(|l| {
+                    l.split(':')
+                        .nth(1)?
+                        .trim()
+                        .trim_end_matches('.')
+                        .parse()
+                        .ok()
+                })
+                .unwrap_or(0)
+        };
+        let active = parse_line("Pages active");
+        let wired = parse_line("Pages wired down");
+        let compressed = parse_line("Pages occupied by compressor");
+        (active + wired + compressed) * page_size
+    });
 
     if total_bytes == 0 {
         "Unknown".into()
@@ -107,9 +106,9 @@ fn get_memory() -> String {
 }
 
 fn get_shell() -> String {
-    std::env::var("SHELL")
-        .ok()
-        .map_or_else(|| "Unknown".into(), |s| {
+    std::env::var("SHELL").ok().map_or_else(
+        || "Unknown".into(),
+        |s| {
             let name = s.rsplit('/').next().unwrap_or(&s).to_string();
             let version = cmd_output(&s, &["--version"])
                 .and_then(|v| v.lines().next().map(std::string::ToString::to_string));
@@ -117,7 +116,8 @@ fn get_shell() -> String {
                 Some(v) if v.contains(&name) => v,
                 _ => name,
             }
-        })
+        },
+    )
 }
 
 fn get_terminal() -> String {

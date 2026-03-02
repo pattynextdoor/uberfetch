@@ -6,7 +6,7 @@ use ratatui::widgets::canvas::{Context, Points};
 use super::math;
 use super::Animation;
 
-const NUM_PARTICLES: usize = 600;
+const NUM_PARTICLES: usize = 1500;
 
 struct Particle {
     theta: f64,
@@ -16,14 +16,12 @@ struct Particle {
 
 /// Toroidal particle flow animation.
 ///
-/// ~600 particles flow along the surface of a parametric torus,
-/// rendered as braille dots with two colour layers for depth.
+/// ~1500 particles flow along the surface of a parametric torus,
+/// rendered as braille dots with four depth-based colour layers.
 pub struct Toroid {
     particles: Vec<Particle>,
     angle_x: f64,
     angle_y: f64,
-    major_radius: f64,
-    minor_radius: f64,
 }
 
 impl Toroid {
@@ -35,7 +33,7 @@ impl Toroid {
                 Particle {
                     theta: frac * TAU,
                     phi: (frac * 7.0 * TAU) % TAU,
-                    speed: 0.5 + (i % 5) as f64 * 0.2,
+                    speed: 0.3 + (i % 7) as f64 * 0.15,
                 }
             })
             .collect();
@@ -43,8 +41,6 @@ impl Toroid {
             particles,
             angle_x: 0.4,
             angle_y: 0.0,
-            major_radius: 20.0,
-            minor_radius: 8.0,
         }
     }
 }
@@ -61,56 +57,83 @@ impl Animation for Toroid {
         }
     }
 
-    fn draw(&self, ctx: &mut Context) {
-        let distance = 4.0 * self.major_radius;
+    fn draw(&self, ctx: &mut Context, viewport: (f64, f64)) {
+        let (vw, vh) = viewport;
+        let vmin = vw.min(vh);
+        // Scale torus radii relative to viewport
+        let major = vmin * 0.50;
+        let minor = major * 0.4;
+        let distance = 4.0 * major;
 
-        let coords: Vec<(f64, f64)> = self
+        // Compute 3D position, project to 2D, and track z for depth
+        let data: Vec<([f64; 2], f64)> = self
             .particles
             .iter()
             .map(|p| {
-                let r = self.major_radius + self.minor_radius * p.phi.cos();
-                let point = [
-                    r * p.theta.cos(),
-                    self.minor_radius * p.phi.sin(),
-                    r * p.theta.sin(),
-                ];
+                let r = major + minor * p.phi.cos();
+                let point = [r * p.theta.cos(), minor * p.phi.sin(), r * p.theta.sin()];
                 let point = math::rotate_x(point, self.angle_x);
                 let point = math::rotate_y(point, self.angle_y);
+                let z = point[2];
                 let proj = math::project(point, distance);
-                (proj[0], proj[1])
+                (proj, z)
             })
             .collect();
 
-        ctx.draw(&Points {
-            coords: &coords,
-            color: Color::Rgb(200, 160, 255),
-        });
-
-        // Second layer with different color for depth
-        let coords2: Vec<(f64, f64)> = self
-            .particles
+        // Z-range for depth normalization
+        let (z_min, z_max) = data
             .iter()
-            .enumerate()
-            .filter(|(i, _)| i % 3 == 0)
-            .map(|(_, p)| {
-                let offset_phi = p.phi + 0.3;
-                let r = self.major_radius + self.minor_radius * offset_phi.cos();
-                let point = [
-                    r * p.theta.cos(),
-                    self.minor_radius * offset_phi.sin(),
-                    r * p.theta.sin(),
-                ];
-                let point = math::rotate_x(point, self.angle_x);
-                let point = math::rotate_y(point, self.angle_y);
-                let proj = math::project(point, distance);
-                (proj[0], proj[1])
-            })
-            .collect();
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), &(_, z)| {
+                (min.min(z), max.max(z))
+            });
+        let z_range = (z_max - z_min).max(0.001);
 
-        ctx.draw(&Points {
-            coords: &coords2,
-            color: Color::Rgb(140, 100, 200),
-        });
+        // Bucket particles by depth layer for back-to-front drawing
+        let mut near = Vec::new();
+        let mut mid_near = Vec::new();
+        let mut mid_far = Vec::new();
+        let mut far = Vec::new();
+
+        for &(proj, z) in &data {
+            let depth = 1.0 - (z - z_min) / z_range;
+            let coord = (proj[0], proj[1]);
+
+            if depth > 0.75 {
+                near.push(coord);
+            } else if depth > 0.50 {
+                mid_near.push(coord);
+            } else if depth > 0.25 {
+                mid_far.push(coord);
+            } else {
+                far.push(coord);
+            }
+        }
+
+        // Draw back-to-front so nearer particles overwrite farther ones
+        if !far.is_empty() {
+            ctx.draw(&Points {
+                coords: &far,
+                color: Color::Rgb(80, 50, 120),
+            });
+        }
+        if !mid_far.is_empty() {
+            ctx.draw(&Points {
+                coords: &mid_far,
+                color: Color::Rgb(140, 100, 190),
+            });
+        }
+        if !mid_near.is_empty() {
+            ctx.draw(&Points {
+                coords: &mid_near,
+                color: Color::Rgb(190, 150, 240),
+            });
+        }
+        if !near.is_empty() {
+            ctx.draw(&Points {
+                coords: &near,
+                color: Color::Rgb(240, 200, 255),
+            });
+        }
     }
 
     fn name(&self) -> &'static str {

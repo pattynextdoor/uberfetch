@@ -1,7 +1,7 @@
 use ratatui::style::Color;
-use ratatui::widgets::canvas::Context;
+use ratatui::widgets::canvas::{Context, Points};
 
-use super::math::{self, Vec4};
+use super::math::{self, Vec3, Vec4};
 use super::Animation;
 
 /// Generate the 16 vertices of a unit tesseract centered at the origin.
@@ -72,12 +72,19 @@ impl Animation for Hypercube {
         self.angle_xz += 0.3 * dt;
     }
 
-    fn draw(&self, ctx: &mut Context) {
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "color values are clamped to 0-255"
+    )]
+    fn draw(&self, ctx: &mut Context, viewport: (f64, f64)) {
+        let (vw, vh) = viewport;
+        let base_scale = vw.min(vh) * 0.55;
         let distance_4d = 3.0;
         let distance_3d = 4.0;
-        let base_scale = 20.0;
 
-        let projected: Vec<[f64; 2]> = self
+        // Transform 4D → 3D, keeping the intermediate 3D result for depth
+        let transformed_3d: Vec<Vec3> = self
             .vertices
             .iter()
             .map(|v| {
@@ -90,23 +97,54 @@ impl Animation for Hypercube {
                 let v = math::rotate_xw(v, self.angle_xw);
                 let v = math::rotate_yz(v, self.angle_yz);
                 let v = math::rotate_xz(v, self.angle_xz);
-                let v3 = math::project_4d_to_3d(v, distance_4d * base_scale);
-                math::project(v3, distance_3d * base_scale)
+                math::project_4d_to_3d(v, distance_4d * base_scale)
             })
             .collect();
 
+        // Project 3D → 2D
+        let projected: Vec<[f64; 2]> = transformed_3d
+            .iter()
+            .map(|&v| math::project(v, distance_3d * base_scale))
+            .collect();
+
+        let visible: Vec<bool> = projected
+            .iter()
+            .map(|p| math::is_visible(*p, vw, vh))
+            .collect();
+
+        // Z-range for depth-based brightness
+        let (z_min, z_max) = transformed_3d
+            .iter()
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), v| {
+                (min.min(v[2]), max.max(v[2]))
+            });
+        let z_range = (z_max - z_min).max(0.001);
+
         for &(i, j) in &self.edges {
-            // Color based on which dimension the edge spans.
-            // The XOR of two adjacent vertex indices has exactly one bit set,
-            // telling us which axis (x=1, y=2, z=4, w=8) the edge runs along.
+            if !visible[i] || !visible[j] {
+                continue;
+            }
+
+            // Color based on which dimension the edge spans
             let diff = i ^ j;
-            let color = match diff {
-                1 => Color::Rgb(100, 180, 255), // x-edges: blue
-                2 => Color::Rgb(255, 100, 180), // y-edges: pink
-                4 => Color::Rgb(100, 255, 180), // z-edges: green
-                8 => Color::Rgb(255, 220, 100), // w-edges: gold
-                _ => Color::White,
+            let base_color: (f64, f64, f64) = match diff {
+                1 => (100.0, 180.0, 255.0), // x-edges: blue
+                2 => (255.0, 100.0, 180.0), // y-edges: pink
+                4 => (100.0, 255.0, 180.0), // z-edges: green
+                8 => (255.0, 220.0, 100.0), // w-edges: gold
+                _ => (255.0, 255.0, 255.0),
             };
+
+            // Modulate color brightness by depth (closer = brighter)
+            let avg_z = f64::midpoint(transformed_3d[i][2], transformed_3d[j][2]);
+            let depth = 1.0 - (avg_z - z_min) / z_range;
+            let brightness = 0.3 + 0.7 * depth;
+
+            let color = Color::Rgb(
+                (base_color.0 * brightness) as u8,
+                (base_color.1 * brightness) as u8,
+                (base_color.2 * brightness) as u8,
+            );
 
             ctx.draw(&ratatui::widgets::canvas::Line {
                 x1: projected[i][0],
@@ -114,6 +152,19 @@ impl Animation for Hypercube {
                 x2: projected[j][0],
                 y2: projected[j][1],
                 color,
+            });
+        }
+
+        // Vertex dots with depth-based brightness
+        for (i, (&vis, proj)) in visible.iter().zip(projected.iter()).enumerate() {
+            if !vis {
+                continue;
+            }
+            let depth = 1.0 - (transformed_3d[i][2] - z_min) / z_range;
+            let b = ((0.4 + 0.6 * depth) * 255.0) as u8;
+            ctx.draw(&Points {
+                coords: &[(proj[0], proj[1])],
+                color: Color::Rgb(b, b, b),
             });
         }
     }

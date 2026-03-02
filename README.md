@@ -4,7 +4,7 @@
 
 <br/>
 
-<h3>🌀 system info, but make it hypnotic.</h3>
+<h3>☄️ system info with esoteric default visuals</h3>
 
 [![Rust](https://img.shields.io/badge/Built_with-Rust-dea584?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
@@ -14,9 +14,7 @@
 
 ---
 
-neofetch but the ASCII art rotates in 3D and you can't stop watching it.
-
-3D wireframe animations rendered entirely with Unicode braille characters — rotating diamonds, tesseracts, toroidal particle flows, and breathing geodesic spheres — next to your system info. Built in Rust, runs at 30 FPS, no GPU. Just vibes.
+I wanted arcane shapes to thrive in the corner of my terminal.
 
 ## Install
 

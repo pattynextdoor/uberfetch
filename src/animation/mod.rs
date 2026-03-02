@@ -1,6 +1,8 @@
 pub mod diamond;
 pub mod geodesic;
+pub mod helix;
 pub mod hypercube;
+pub mod lorenz;
 pub mod math;
 pub mod toroid;
 
@@ -28,6 +30,8 @@ pub fn list_animations() -> Vec<(&'static str, &'static str)> {
         Box::new(hypercube::Hypercube::new()),
         Box::new(toroid::Toroid::new()),
         Box::new(geodesic::Geodesic::new()),
+        Box::new(lorenz::Lorenz::new()),
+        Box::new(helix::Helix::new()),
     ];
     all.iter().map(|a| (a.name(), a.description())).collect()
 }

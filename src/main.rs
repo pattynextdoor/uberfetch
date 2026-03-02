@@ -18,7 +18,7 @@ use animation::Animation;
 #[command(name = "uberfetch", version, about)]
 struct Cli {
     /// Animation to display.
-    #[arg(short, long, value_enum, default_value_t = AnimationChoice::Diamond)]
+    #[arg(short, long, value_enum, default_value_t = AnimationChoice::Hypercube)]
     animation: AnimationChoice,
 
     /// Target frames per second.
@@ -37,6 +37,8 @@ enum AnimationChoice {
     Hypercube,
     Toroid,
     Geodesic,
+    Lorenz,
+    Helix,
 }
 
 fn main() -> io::Result<()> {
@@ -55,6 +57,8 @@ fn main() -> io::Result<()> {
         AnimationChoice::Hypercube => Box::new(animation::hypercube::Hypercube::new()),
         AnimationChoice::Toroid => Box::new(animation::toroid::Toroid::new()),
         AnimationChoice::Geodesic => Box::new(animation::geodesic::Geodesic::new()),
+        AnimationChoice::Lorenz => Box::new(animation::lorenz::Lorenz::new()),
+        AnimationChoice::Helix => Box::new(animation::helix::Helix::new()),
     };
 
     let info = sysinfo::SystemInfo::collect();

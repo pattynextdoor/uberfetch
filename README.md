@@ -20,6 +20,14 @@ I wanted arcane shapes to thrive in the corner of my terminal.
 ## Install
 
 ```sh
+cargo install uberfetch
+```
+
+Or from source:
+
+```sh
+git clone https://github.com/pattynextdoor/uberfetch.git
+cd uberfetch
 cargo install --path .
 ```
 

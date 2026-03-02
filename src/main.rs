@@ -53,10 +53,7 @@ fn main() -> io::Result<()> {
         AnimationChoice::Diamond => Box::new(Diamond::new()),
         AnimationChoice::Hypercube => Box::new(animation::hypercube::Hypercube::new()),
         AnimationChoice::Toroid => Box::new(animation::toroid::Toroid::new()),
-        _ => {
-            eprintln!("Animation not yet implemented, using diamond");
-            Box::new(Diamond::new())
-        }
+        AnimationChoice::Geodesic => Box::new(animation::geodesic::Geodesic::new()),
     };
 
     let info = sysinfo::SystemInfo::collect();

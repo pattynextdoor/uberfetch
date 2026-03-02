@@ -1,5 +1,6 @@
 pub mod math;
 pub mod diamond;
+pub mod geodesic;
 pub mod hypercube;
 pub mod toroid;
 

@@ -1,2 +1,2 @@
-mod color;
-mod layout;
+pub mod color;
+pub mod layout;

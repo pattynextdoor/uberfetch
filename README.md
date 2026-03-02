@@ -6,6 +6,7 @@
 
 <h3>☄️ system info with esoteric default visuals</h3>
 
+[![CI](https://img.shields.io/github/actions/workflow/status/pattynextdoor/uberfetch/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/pattynextdoor/uberfetch/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/Built_with-Rust-dea584?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 [![Alpha](https://img.shields.io/badge/Status-Alpha-orange?style=flat-square)](#status)

@@ -23,26 +23,128 @@ pub fn collect() -> SystemInfo {
 }
 
 fn get_gpu() -> String {
-    "Unknown".into()
+    cmd_output("lspci", &[])
+        .and_then(|raw| {
+            raw.lines()
+                .find(|l| l.contains("VGA") || l.contains("3D controller"))
+                .and_then(|l| {
+                    // Format: "00:02.0 VGA compatible controller: Vendor Device"
+                    let after_type = l.splitn(3, ':').nth(2)?;
+                    Some(after_type.trim().to_string())
+                })
+        })
+        .unwrap_or_else(|| "Unknown".into())
 }
 
 fn get_disk() -> String {
-    "Unknown".into()
+    super::parse_df_root(&cmd_output("df", &["-h", "/"]).unwrap_or_default())
+        .unwrap_or_else(|| "Unknown".into())
 }
 
 fn get_packages() -> String {
+    // Try package managers in order of popularity
+    if let Some(out) = cmd_output("dpkg-query", &["-f", ".\n", "-W"]) {
+        let count = out.lines().count();
+        if count > 0 {
+            return format!("{count} (dpkg)");
+        }
+    }
+    if let Some(out) = cmd_output("rpm", &["-qa"]) {
+        let count = out.lines().count();
+        if count > 0 {
+            return format!("{count} (rpm)");
+        }
+    }
+    if let Some(out) = cmd_output("pacman", &["-Q"]) {
+        let count = out.lines().count();
+        if count > 0 {
+            return format!("{count} (pacman)");
+        }
+    }
     "Unknown".into()
 }
 
 fn get_de_wm() -> String {
+    // Try environment variables first
+    if let Ok(desktop) = std::env::var("XDG_CURRENT_DESKTOP") {
+        if !desktop.is_empty() {
+            return desktop;
+        }
+    }
+    if let Ok(session) = std::env::var("DESKTOP_SESSION") {
+        if !session.is_empty() {
+            return session;
+        }
+    }
+    // Fallback: scan for common WM processes
+    let wms = [
+        "sway",
+        "hyprland",
+        "i3",
+        "bspwm",
+        "dwm",
+        "openbox",
+        "fluxbox",
+        "awesome",
+        "xmonad",
+        "herbstluftwm",
+        "qtile",
+    ];
+    if let Some(procs) = cmd_output("ps", &["-eo", "comm"]) {
+        for wm in &wms {
+            if procs.lines().any(|l| l.trim() == *wm) {
+                return (*wm).to_string();
+            }
+        }
+    }
     "Unknown".into()
 }
 
 fn get_resolution() -> String {
+    // Try xrandr first (X11)
+    if let Some(raw) = cmd_output("xrandr", &["--current"]) {
+        if let Some(res) = raw
+            .lines()
+            .find(|l| l.contains(" connected"))
+            .and_then(|l| {
+                l.split_whitespace().find(|w| {
+                    w.contains('x') && w.chars().next().map_or(false, |c| c.is_ascii_digit())
+                })
+            })
+        {
+            // Strip off any +offset suffix (e.g. "1920x1080+0+0" → "1920x1080")
+            return res.split('+').next().unwrap_or(res).to_string();
+        }
+    }
+    // Fallback: xdpyinfo
+    if let Some(raw) = cmd_output("xdpyinfo", &[]) {
+        if let Some(line) = raw.lines().find(|l| l.contains("dimensions:")) {
+            if let Some(dim) = line.split_whitespace().nth(1) {
+                return dim.to_string();
+            }
+        }
+    }
     "Unknown".into()
 }
 
 fn get_battery() -> Option<String> {
+    // Try BAT0 then BAT1
+    for bat in &["BAT0", "BAT1"] {
+        let base = format!("/sys/class/power_supply/{bat}");
+        if let Some(capacity) = read_file(&format!("{base}/capacity")) {
+            let pct = capacity.trim();
+            let status = read_file(&format!("{base}/status"))
+                .map(|s| s.trim().to_lowercase())
+                .unwrap_or_else(|| "unknown".into());
+            let state = match status.as_str() {
+                "charging" => "charging",
+                "discharging" => "discharging",
+                "full" => "full",
+                _ => "unknown",
+            };
+            return Some(format!("{pct}% ({state})"));
+        }
+    }
     None
 }
 

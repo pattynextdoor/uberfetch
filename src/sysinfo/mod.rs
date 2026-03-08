@@ -22,9 +22,15 @@ pub struct SystemInfo {
     pub kernel: String,
     pub uptime: String,
     pub cpu: String,
+    pub gpu: String,
     pub memory: String,
+    pub disk: String,
+    pub packages: String,
     pub shell: String,
     pub terminal: String,
+    pub de_wm: String,
+    pub resolution: String,
+    pub battery: Option<String>,
 }
 
 impl SystemInfo {

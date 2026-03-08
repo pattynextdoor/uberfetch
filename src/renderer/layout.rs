@@ -55,15 +55,23 @@ fn draw_info(frame: &mut Frame, info: &SystemInfo, area: Rect) {
     let title = format!("{username}@{}", info.hostname);
     let separator = "\u{2500}".repeat(title.len());
 
-    let fields = [
+    let mut fields = vec![
         ("OS", info.os.as_str()),
         ("Kernel", info.kernel.as_str()),
         ("Uptime", info.uptime.as_str()),
         ("CPU", info.cpu.as_str()),
+        ("GPU", info.gpu.as_str()),
         ("Memory", info.memory.as_str()),
+        ("Disk", info.disk.as_str()),
+        ("Packages", info.packages.as_str()),
         ("Shell", info.shell.as_str()),
         ("Terminal", info.terminal.as_str()),
+        ("DE/WM", info.de_wm.as_str()),
+        ("Resolution", info.resolution.as_str()),
     ];
+    if let Some(ref bat) = info.battery {
+        fields.push(("Battery", bat.as_str()));
+    }
 
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(Span::styled(

@@ -7,10 +7,40 @@ pub fn collect() -> SystemInfo {
         kernel: get_kernel(),
         uptime: get_uptime(),
         cpu: get_cpu(),
+        gpu: get_gpu(),
         memory: get_memory(),
+        disk: get_disk(),
+        packages: get_packages(),
         shell: get_shell(),
         terminal: get_terminal(),
+        de_wm: get_de_wm(),
+        resolution: get_resolution(),
+        battery: get_battery(),
     }
+}
+
+fn get_gpu() -> String {
+    "Unknown".into()
+}
+
+fn get_disk() -> String {
+    "Unknown".into()
+}
+
+fn get_packages() -> String {
+    "Unknown".into()
+}
+
+fn get_de_wm() -> String {
+    "Unknown".into()
+}
+
+fn get_resolution() -> String {
+    "Unknown".into()
+}
+
+fn get_battery() -> Option<String> {
+    None
 }
 
 fn sysctl(key: &str) -> Option<String> {

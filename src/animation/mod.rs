@@ -2,9 +2,12 @@ pub mod diamond;
 pub mod geodesic;
 pub mod helix;
 pub mod hypercube;
+pub mod klein;
 pub mod lorenz;
 pub mod math;
+pub mod mobius;
 pub mod toroid;
+pub mod torus_knot;
 
 use ratatui::widgets::canvas::Context;
 
@@ -32,6 +35,9 @@ pub fn list_animations() -> Vec<(&'static str, &'static str)> {
         Box::new(geodesic::Geodesic::new()),
         Box::new(lorenz::Lorenz::new()),
         Box::new(helix::Helix::new()),
+        Box::new(mobius::Mobius::new()),
+        Box::new(torus_knot::TorusKnot::new()),
+        Box::new(klein::Klein::new()),
     ];
     all.iter().map(|a| (a.name(), a.description())).collect()
 }

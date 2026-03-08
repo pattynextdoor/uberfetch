@@ -33,15 +33,20 @@ Run `uberfetch`. Stare.
 ## Usage
 
 ```sh
-uberfetch                        # default → rotating diamond
-uberfetch --animation toroid     # toroidal particle flow
-uberfetch --animation hypercube  # 4D tesseract projection
-uberfetch --animation geodesic   # breathing geodesic sphere
-uberfetch --fps 60               # smoother on fast terminals
-uberfetch --list                 # list all animations
+uberfetch                          # default → rotating hypercube
+uberfetch --animation toroid       # toroidal particle flow
+uberfetch --animation mobius       # Möbius strip particle flow
+uberfetch --animation torus-knot   # trefoil torus knot
+uberfetch --animation klein        # Klein bottle immersion
+uberfetch --fps 60                 # smoother on fast terminals
+uberfetch --list                   # list all animations
 ```
 
 Press `q`, `Esc`, or `Ctrl+C` to leave (if you can).
+
+## Stats
+
+OS, Kernel, Uptime, CPU, GPU, Memory, Disk, Packages, Shell, Terminal, DE/WM, Resolution, Battery (laptops only).
 
 ## Animations
 
@@ -51,6 +56,11 @@ Press `q`, `Esc`, or `Ctrl+C` to leave (if you can).
 | **hypercube** | 4D tesseract projected into 3D, dual-axis rotation |
 | **toroid** | Particles flowing along a torus surface |
 | **geodesic** | Icosphere with breathing vertex oscillation |
+| **lorenz** | Chaotic Lorenz attractor particle system |
+| **helix** | Double helix particle flow |
+| **mobius** | Möbius strip particle flow |
+| **torus-knot** | Trefoil (2,3) torus knot flow |
+| **klein** | Klein bottle figure-8 immersion |
 
 All rendered as braille-dot wireframes — no GPU, no sixel, just Unicode.
 

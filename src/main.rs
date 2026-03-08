@@ -39,6 +39,9 @@ enum AnimationChoice {
     Geodesic,
     Lorenz,
     Helix,
+    Mobius,
+    TorusKnot,
+    Klein,
 }
 
 fn main() -> io::Result<()> {
@@ -59,6 +62,9 @@ fn main() -> io::Result<()> {
         AnimationChoice::Geodesic => Box::new(animation::geodesic::Geodesic::new()),
         AnimationChoice::Lorenz => Box::new(animation::lorenz::Lorenz::new()),
         AnimationChoice::Helix => Box::new(animation::helix::Helix::new()),
+        AnimationChoice::Mobius => Box::new(animation::mobius::Mobius::new()),
+        AnimationChoice::TorusKnot => Box::new(animation::torus_knot::TorusKnot::new()),
+        AnimationChoice::Klein => Box::new(animation::klein::Klein::new()),
     };
 
     let info = sysinfo::SystemInfo::collect();

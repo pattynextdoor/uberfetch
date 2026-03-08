@@ -36,7 +36,6 @@ Run `uberfetch`. Stare.
 uberfetch                          # default → rotating hypercube
 uberfetch --animation toroid       # toroidal particle flow
 uberfetch --animation mobius       # Möbius strip particle flow
-uberfetch --animation torus-knot   # trefoil torus knot
 uberfetch --animation klein        # Klein bottle immersion
 uberfetch --fps 60                 # smoother on fast terminals
 uberfetch --list                   # list all animations
@@ -59,7 +58,6 @@ OS, Kernel, Uptime, CPU, GPU, Memory, Disk, Packages, Shell, Terminal, DE/WM, Re
 | **lorenz** | Chaotic Lorenz attractor particle system |
 | **helix** | Double helix particle flow |
 | **mobius** | Möbius strip particle flow |
-| **torus-knot** | Trefoil (2,3) torus knot flow |
 | **klein** | Klein bottle figure-8 immersion |
 
 All rendered as braille-dot wireframes — no GPU, no sixel, just Unicode.

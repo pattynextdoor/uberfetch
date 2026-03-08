@@ -20,27 +20,62 @@ pub fn collect() -> SystemInfo {
 }
 
 fn get_gpu() -> String {
-    "Unknown".into()
+    cmd_output("system_profiler", &["SPDisplaysDataType"])
+        .and_then(|raw| {
+            raw.lines()
+                .find(|l| l.contains("Chipset Model:"))
+                .and_then(|l| Some(l.split(':').nth(1)?.trim().to_string()))
+        })
+        .unwrap_or_else(|| "Unknown".into())
 }
 
 fn get_disk() -> String {
-    "Unknown".into()
+    super::parse_df_root(&cmd_output("df", &["-h", "/"]).unwrap_or_default())
+        .unwrap_or_else(|| "Unknown".into())
 }
 
 fn get_packages() -> String {
-    "Unknown".into()
+    let formula = cmd_output("brew", &["list", "--formula", "-1"]).map_or(0, |s| s.lines().count());
+    let cask = cmd_output("brew", &["list", "--cask", "-1"]).map_or(0, |s| s.lines().count());
+    let total = formula + cask;
+    if total == 0 {
+        "Unknown".into()
+    } else {
+        format!("{total} (brew)")
+    }
 }
 
 fn get_de_wm() -> String {
-    "Unknown".into()
+    "Aqua".into()
 }
 
 fn get_resolution() -> String {
-    "Unknown".into()
+    cmd_output("system_profiler", &["SPDisplaysDataType"])
+        .and_then(|raw| {
+            raw.lines()
+                .find(|l| l.contains("Resolution:"))
+                .and_then(|l| Some(l.split(':').nth(1)?.trim().to_string()))
+        })
+        .unwrap_or_else(|| "Unknown".into())
 }
 
 fn get_battery() -> Option<String> {
-    None
+    let raw = cmd_output("pmset", &["-g", "batt"])?;
+    parse_pmset_battery(&raw)
+}
+
+/// Parse `pmset -g batt` output into a display string like "75% (charging)".
+fn parse_pmset_battery(raw: &str) -> Option<String> {
+    let line = raw.lines().find(|l| l.contains("InternalBattery"))?;
+    let pct = line.split('\t').nth(1)?.split(';').next()?.trim();
+    let state = if line.contains("charging") && !line.contains("discharging") {
+        "charging"
+    } else if line.contains("discharging") {
+        "discharging"
+    } else {
+        "full"
+    };
+    Some(format!("{pct} ({state})"))
 }
 
 fn sysctl(key: &str) -> Option<String> {
@@ -141,4 +176,40 @@ fn get_shell() -> String {
 
 fn get_terminal() -> String {
     std::env::var("TERM_PROGRAM").unwrap_or_else(|_| "Unknown".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod parse_pmset_battery_tests {
+        use super::*;
+
+        #[test]
+        fn parses_charging_battery() {
+            let raw = "Now drawing from 'AC Power'\n \
+                        -InternalBattery-0 (id=1234)\t75%; charging; 1:23 remaining present: true";
+            assert_eq!(parse_pmset_battery(raw).unwrap(), "75% (charging)");
+        }
+
+        #[test]
+        fn parses_discharging_battery() {
+            let raw = "Now drawing from 'Battery Power'\n \
+                        -InternalBattery-0 (id=1234)\t42%; discharging; 3:45 remaining present: true";
+            assert_eq!(parse_pmset_battery(raw).unwrap(), "42% (discharging)");
+        }
+
+        #[test]
+        fn parses_full_battery() {
+            let raw = "Now drawing from 'AC Power'\n \
+                        -InternalBattery-0 (id=1234)\t100%; charged; 0:00 remaining present: true";
+            assert_eq!(parse_pmset_battery(raw).unwrap(), "100% (full)");
+        }
+
+        #[test]
+        fn returns_none_when_no_battery() {
+            let raw = "Now drawing from 'AC Power'\n No battery.";
+            assert!(parse_pmset_battery(raw).is_none());
+        }
+    }
 }

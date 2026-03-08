@@ -64,6 +64,24 @@ pub fn format_uptime(total_secs: u64) -> String {
     }
 }
 
+/// Parse `df -h /` output into a display string like "123G / 500G (45%)".
+///
+/// Expects the standard `df -h` header + data layout where the second line
+/// contains: Filesystem Size Used Avail Capacity ...
+fn parse_df_root(raw: &str) -> Option<String> {
+    let line = raw.lines().nth(1)?;
+    let cols: Vec<&str> = line.split_whitespace().collect();
+    // macOS: Filesystem Size Used Available Capacity ...
+    // Linux:  Filesystem Size Used Avail Use% ...
+    if cols.len() < 5 {
+        return None;
+    }
+    let size = cols[1];
+    let used = cols[2];
+    let pct = cols[4].trim_end_matches('%');
+    Some(format!("{used} / {size} ({pct}%)"))
+}
+
 /// Format memory usage as "X.X GiB / Y.Y GiB".
 #[expect(
     clippy::cast_precision_loss,
@@ -121,6 +139,36 @@ mod tests {
             let used = 8_589_934_592; // 8 GiB
             let total = 17_179_869_184; // 16 GiB
             assert_eq!(format_memory(used, total), "8.0 GiB / 16.0 GiB");
+        }
+    }
+
+    mod parse_df_root_tests {
+        use super::*;
+
+        #[test]
+        fn parses_macos_df_output() {
+            let raw =
+                "Filesystem     Size   Used  Avail Capacity  iused ifree %iused  Mounted on\n\
+                        /dev/disk3s1  460Gi  123Gi  320Gi    28%  1234567  4567890   21%   /";
+            assert_eq!(parse_df_root(raw).unwrap(), "123Gi / 460Gi (28%)");
+        }
+
+        #[test]
+        fn parses_linux_df_output() {
+            let raw = "Filesystem      Size  Used Avail Use% Mounted on\n\
+                        /dev/sda1       100G   67G   33G  67% /";
+            assert_eq!(parse_df_root(raw).unwrap(), "67G / 100G (67%)");
+        }
+
+        #[test]
+        fn returns_none_for_empty_input() {
+            assert!(parse_df_root("").is_none());
+        }
+
+        #[test]
+        fn returns_none_for_header_only() {
+            let raw = "Filesystem      Size  Used Avail Use% Mounted on";
+            assert!(parse_df_root(raw).is_none());
         }
     }
 }
